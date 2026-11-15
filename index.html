@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>Tomb Sweet Tomb</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Rubik:wght@400;500;700&display=swap">
+<style>
+/* Layout: one column — stat strip, the tomb cross-section (canvas), trap shop, controls. Single dark look: inside a pyramid at night. */
+:root {
+  color-scheme: dark;
+  --night: #17131c;
+  --chamber: #241d2b;
+  --chamber-2: #30273a;
+  --sand: #e0b266;
+  --sand-dim: #a98a5a;
+  --papyrus: #f3e6c8;
+  --lapis: #3b82d6;
+  --turq: #37c2ad;
+  --gold: #f4c542;
+  --blood: #e5553d;
+  --line: #4a3d57;
+  --display: "Bowlby One", "Arial Black", Impact, sans-serif;
+  --body: "Rubik", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+body {
+  background: var(--night);
+  color: var(--papyrus);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.4;
+  padding-block: 14px 24px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 980px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+.top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 18px; }
+h1 { font-family: var(--display); font-weight: 400; font-size: clamp(22px, 5vw, 34px); margin: 0; color: var(--sand); letter-spacing: .01em; line-height: 1.05; text-wrap: balance; }
+.stats { display: flex; flex-wrap: wrap; gap: 4px 16px; font-variant-numeric: tabular-nums; font-weight: 700; }
+.stats span { display: inline-flex; align-items: baseline; gap: 6px; }
+.stats small { font-weight: 500; font-size: 11px; letter-spacing: .09em; text-transform: uppercase; color: var(--sand-dim); }
+#sGold { color: var(--gold); } #sJars { color: var(--turq); }
+.stage { position: relative; border: 2px solid var(--line); background: #000; }
+canvas#game { display: block; width: 100%; aspect-ratio: 16 / 10; max-width: 100%; touch-action: manipulation; cursor: pointer; }
+.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(15, 11, 20, .84); padding: 14px; overflow: auto; }
+.card { max-width: 460px; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.card h2 { font-family: var(--display); font-weight: 400; color: var(--gold); font-size: clamp(20px, 5vw, 30px); margin: 0; text-wrap: balance; }
+.card p { margin: 0; color: var(--papyrus); }
+.card ol { text-align: left; margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 3px; }
+button { font-family: var(--body); font-size: 14px; color: var(--papyrus); background: var(--chamber-2); border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; cursor: pointer; }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+button:disabled { opacity: .45; cursor: default; }
+button.primary { background: var(--gold); color: #2a1d05; border-color: var(--gold); font-weight: 700; }
+button.danger { border-color: var(--blood); color: #ffb9ab; }
+.shop { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 640px) { .shop { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.shop button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; background: var(--chamber); min-width: 0; }
+.shop button canvas { width: 40px; height: 40px; }
+.shop button b { font-size: 12.5px; font-weight: 700; line-height: 1.15; text-align: center; }
+.shop button i { font-style: normal; font-size: 12px; color: var(--gold); font-variant-numeric: tabular-nums; }
+.shop button[aria-pressed="true"] { border-color: var(--gold); background: var(--chamber-2); box-shadow: inset 0 -3px 0 var(--gold); }
+.shop button.poor i { color: var(--blood); }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#hint { flex: 1 1 220px; min-width: 0; color: var(--sand); font-size: 13.5px; min-height: 2.8em; display: flex; align-items: center; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="top">
+    <h1>Tomb Sweet Tomb</h1>
+    <div class="stats">
+      <span><small>Gold</small><b id="sGold">0</b></span>
+      <span><small>Jars left</small><b id="sJars">0</b></span>
+      <span><small>Stopped</small><b id="sKills">0</b></span>
+      <span><small>Time</small><b id="sTime">0:00</b></span>
+    </div>
+  </div>
+
+  <div class="stage">
+    <canvas id="game" width="960" height="600" aria-label="Cross-section of the pyramid. Tap a corridor tile to place the selected trap."></canvas>
+    <div class="overlay" id="overlay">
+      <div class="card">
+        <h2 id="ovTitle">King Naptep wants to sleep</h2>
+        <div id="ovBody">
+          <p>You are a 3,000-year-old mummy. An endless stream of tiny tomb raiders is running and jumping down your pyramid to carry off your golden jars. One touch from any trap finishes a raider.</p>
+          <ol>
+            <li>Pick a trap from the shop and tap a corridor tile to build it.</li>
+            <li>Open the gates. The stream never stops and keeps getting thicker.</li>
+            <li>Keep building while they run. Tap a built trap to upgrade or sell it.</li>
+          </ol>
+        </div>
+        <button class="primary" id="ovBtn">Seal the tomb</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="shop" id="shop"></div>
+
+  <div class="bar">
+    <div id="hint" aria-live="polite"></div>
+    <button id="btnUp" hidden>Upgrade</button>
+    <button id="btnSell" class="danger" hidden>Sell</button>
+    <button id="btnSpeed" aria-label="Game speed">Speed 1×</button>
+    <button id="btnRun" class="primary">Open the gates</button>
+  </div>
+</div>
+
+<script>
+(() => {
+const T = 60, COLS = 16, ROWS = 10, W = COLS * T, H = ROWS * T, G = 1400;
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+const dpr = Math.min(2, window.devicePixelRatio || 1);
+cv.width = W * dpr; cv.height = H * dpr;
+
+const $ = id => document.getElementById(id);
+const floorY = c => (2 + 2 * c) * T;
+const dirOf = c => (c % 2 === 0 ? 1 : -1);
+const holeCol = c => (c === 0 || c === 2 ? 14 : c === 1 ? 1 : -1);
+const inHole = (c, x) => { const h = holeCol(c); return h >= 0 && x > h * T + 6 && x < h * T + T - 6; };
+const key = (c, col) => c + ',' + col;
+const buildable = (c, col) => c >= 0 && c <= 3 && col >= 1 && col <= 14 && col !== holeCol(c) && !(c === 3 && col <= 3);
+
+const TRAPS = {
+  scarab: { name: 'Scarab Nest', cost: 25, desc: 'Beetles drag down one raider who steps on the tile, then need a moment to regroup.' },
+  tar:    { name: 'Tar Pit', cost: 30, desc: 'Slows raiders to a crawl so your other traps get more chances.' },
+  dart:   { name: 'Dart Mask', cost: 60, desc: 'Spits darts down its own corridor. Upgraded darts go through more raiders.' },
+  slab:   { name: 'Fling Slab', cost: 45, desc: 'Flips everyone on it back up the corridor to run your traps again.' },
+  urn:    { name: 'Fire Urn', cost: 90, desc: 'Erupts every few seconds and clears every tile beside it.' },
+  eye:    { name: 'Glare Eye', cost: 120, desc: 'Stares at the lead raider and zaps them, even through floors.' },
+};
+const ORDER = ['scarab', 'tar', 'dart', 'slab', 'urn', 'eye'];
+const L = (t, arr) => arr[t.lvl - 1];
+const upCost = t => Math.round(TRAPS[t.type].cost * (t.lvl === 1 ? 0.8 : 1.4));
+
+/* jump = chance to hop over a floor trap they notice */
+const RAIDERS = {
+  looter: { sp: 62,  s: 0.78, col: '#c9a66b', jump: 0.25 },
+  runner: { sp: 118, s: 0.7,  col: '#d8553f', jump: 0.15 },
+  acro:   { sp: 80,  s: 0.72, col: '#a26bd1', jump: 0.9 },
+  porter: { sp: 46,  s: 1.0,  col: '#7a8a5c', jump: 0, shield: true },
+};
+
+let S, best = 0;
+try { best = +localStorage.getItem('tomb-best') || 0; } catch (e) {}
+function reset() {
+  S = { gold: 150, jars: 20, kills: 0, clock: 0, phase: 'idle', traps: new Map(), raiders: [], shots: [], fx: [], spawnT: 0.5,
+        pick: 'scarab', sel: null, hover: null, speed: 1, time: 0, msg: '', msgT: 0, shown: -1 };
+  refresh();
+}
+const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+
+/* ---------- shop ---------- */
+const shop = $('shop');
+ORDER.forEach(id => {
+  const b = document.createElement('button');
+  b.id = 'shop-' + id; b.type = 'button';
+  b.innerHTML = `<canvas width="80" height="80"></canvas><b>${TRAPS[id].name}</b><i>${TRAPS[id].cost} gold</i>`;
+  b.addEventListener('click', () => { S.pick = S.pick === id ? null : id; S.sel = null; refresh(); });
+  shop.appendChild(b);
+  const c2 = b.querySelector('canvas').getContext('2d');
+  c2.scale(80 / 60, 80 / 60);
+  drawTrap(c2, { type: id, lvl: 1, cd: 0, t: 1.2, col: 0, c: 0, anim: 0 }, 30, 54, true);
+});
+
+function say(m) { S.msg = m; S.msgT = 2.5; refresh(); }
+
+function refresh() {
+  $('sGold').textContent = S.gold;
+  $('sJars').textContent = Math.max(0, S.jars);
+  $('sKills').textContent = S.kills;
+  $('sTime').textContent = fmt(S.clock);
+  ORDER.forEach(id => {
+    const b = $('shop-' + id);
+    b.setAttribute('aria-pressed', S.pick === id ? 'true' : 'false');
+    b.classList.toggle('poor', S.gold < TRAPS[id].cost);
+  });
+  const up = $('btnUp'), sell = $('btnSell');
+  let hint = '';
+  if (S.sel) {
+    const t = S.sel, d = TRAPS[t.type];
+    hint = `${d.name}, level ${t.lvl}. ${d.desc}`;
+    sell.hidden = false; sell.textContent = `Sell +${Math.round(t.spent * 0.6)}`;
+    up.hidden = false;
+    if (t.lvl >= 3) { up.textContent = 'Max level'; up.disabled = true; }
+    else { up.textContent = `Upgrade ${upCost(t)}`; up.disabled = S.gold < upCost(t); }
+  } else {
+    up.hidden = true; sell.hidden = true;
+    if (S.pick) hint = `${TRAPS[S.pick].name}: ${TRAPS[S.pick].desc}`;
+    else hint = 'Pick a trap, then tap a corridor tile. Tap a built trap to upgrade or sell it.';
+  }
+  if (S.msgT > 0) hint = S.msg;
+  $('hint').textContent = hint;
+  const br = $('btnRun');
+  br.disabled = S.phase === 'over';
+  br.textContent = S.phase === 'run' ? 'Pause' : S.phase === 'paused' ? 'Resume' : S.phase === 'over' ? 'Tomb looted' : 'Open the gates';
+  $('btnSpeed').textContent = `Speed ${S.speed}×`;
+}
+
+/* ---------- input ---------- */
+function tileAt(ev) {
+  const r = cv.getBoundingClientRect();
+  const x = (ev.clientX - r.left) / r.width * W, y = (ev.clientY - r.top) / r.height * H;
+  const col = Math.floor(x / T), row = Math.floor(y / T);
+  if (row % 2 !== 1 || row > 7) return null;
+  return { c: (row - 1) / 2, col };
+}
+cv.addEventListener('pointermove', ev => { if (ev.pointerType === 'mouse') S.hover = tileAt(ev); });
+cv.addEventListener('pointerleave', () => { S.hover = null; });
+cv.addEventListener('click', ev => {
+  if (S.phase === 'over') return;
+  const t = tileAt(ev);
+  if (!t) { S.sel = null; refresh(); return; }
+  const ex = S.traps.get(key(t.c, t.col));
+  if (ex) { S.sel = S.sel === ex ? null : ex; refresh(); return; }
+  S.sel = null;
+  if (!S.pick) { refresh(); return; }
+  if (!buildable(t.c, t.col)) return say('Nothing can be built on that tile.');
+  const d = TRAPS[S.pick];
+  if (S.gold < d.cost) return say(`Not enough gold for a ${d.name}. It costs ${d.cost}.`);
+  S.gold -= d.cost;
+  S.traps.set(key(t.c, t.col), { type: S.pick, c: t.c, col: t.col, lvl: 1, cd: 0, t: 0, spent: d.cost, anim: 0, charge: 0, id: Math.random() });
+  puff(t.col * T + 30, floorY(t.c) - 10, '#e0b266', 8);
+  refresh();
+});
+$('btnUp').addEventListener('click', () => {
+  const t = S.sel; if (!t || t.lvl >= 3) return;
+  const c = upCost(t); if (S.gold < c) return;
+  S.gold -= c; t.spent += c; t.lvl++; refresh();
+});
+$('btnSell').addEventListener('click', () => {
+  const t = S.sel; if (!t) return;
+  S.gold += Math.round(t.spent * 0.6); S.traps.delete(key(t.c, t.col)); S.sel = null; refresh();
+});
+$('btnSpeed').addEventListener('click', () => { S.speed = S.speed === 1 ? 2 : S.speed === 2 ? 3 : 1; refresh(); });
+$('btnRun').addEventListener('click', toggleRun);
+$('ovBtn').addEventListener('click', () => { if (S.phase === 'over') reset(); $('overlay').hidden = true; });
+document.addEventListener('keydown', ev => {
+  if (ev.target.tagName === 'BUTTON' && (ev.key === ' ' || ev.key === 'Enter')) return;
+  const n = parseInt(ev.key, 10);
+  if (n >= 1 && n <= 6) { S.pick = ORDER[n - 1]; S.sel = null; refresh(); }
+  if (ev.key === ' ') { ev.preventDefault(); toggleRun(); }
+});
+
+function toggleRun() {
+  if (S.phase === 'over' || !$('overlay').hidden) return;
+  S.phase = S.phase === 'run' ? 'paused' : 'run';
+  refresh();
+}
+
+/* ---------- simulation ---------- */
+function pickType() {
+  const r = Math.random(), t = S.clock;
+  if (t > 100 && r < 0.14) return 'porter';
+  if (t > 55 && r < 0.36) return 'acro';
+  if (t > 25 && r < 0.6) return 'runner';
+  return 'looter';
+}
+function spawn(type) {
+  const d = RAIDERS[type];
+  S.raiders.push({ type, d, sp: d.sp * (0.88 + Math.random() * 0.24), x: -20 - Math.random() * 20, y: floorY(0), vx: 0, vy: 0, c: 0, grounded: true,
+    shield: !!d.shield, inv: 0, slow: 1, stun: 0, jumping: false, knocked: false, falling: false, jumpCd: 0.3, seen: new Set(), flung: new Set(), ph: Math.random() * 6, hit: 0 });
+}
+const progress = e => e.c * 1000 + (dirOf(e.c) > 0 ? e.x : W - e.x);
+/* every trap hit is final, unless a porter's crate takes it */
+function zap(e) {
+  if (e.gone || e.inv > 0) return false;
+  if (e.shield) { e.shield = false; e.inv = 0.6; e.hit = 0.2; puff(e.x, e.y - 14, '#5b4126', 6); return false; }
+  e.gone = true; S.kills++; S.gold += 1;
+  puff(e.x, e.y - 12, e.d.col, 6);
+  return true;
+}
+function puff(x, y, col, n) { if (S.fx.length > 400) return; for (let i = 0; i < n; i++) S.fx.push({ k: 'p', x, y, vx: (Math.random() - .5) * 160, vy: -Math.random() * 160, life: .5, col }); }
+
+function step(dt) {
+  S.time += dt;
+  if (S.msgT > 0) { S.msgT -= dt; if (S.msgT <= 0) refresh(); }
+  if (S.phase !== 'run') { stepFx(dt); return; }
+  S.clock += dt;
+
+  const rate = Math.min(30, 0.7 + S.clock / 22);
+  S.spawnT -= dt;
+  while (S.spawnT <= 0) { spawn(pickType()); S.spawnT += (0.6 + Math.random() * 0.8) / rate; }
+
+  /* raiders */
+  for (const e of S.raiders) {
+    const dir = dirOf(e.c), h = 26 * e.d.s;
+    e.hit -= dt; e.jumpCd -= dt; e.inv -= dt; e.ph += dt * e.sp * 0.14;
+    e.slow = 1;
+    const tr = S.traps.get(key(e.c, Math.floor(e.x / T)));
+    if (e.grounded && tr && tr.type === 'tar') e.slow = L(tr, [0.5, 0.36, 0.24]);
+    if (e.grounded) {
+      if (e.stun > 0) { e.stun -= dt; e.vx = 0; }
+      else {
+        e.vx = dir * e.sp * e.slow;
+        if (e.jumpCd <= 0 && e.d.jump > 0) {
+          const ahead = S.traps.get(key(e.c, Math.floor((e.x + dir * 26) / T)));
+          if (ahead && ahead !== tr && !e.seen.has(ahead.id) && (ahead.type === 'scarab' || ahead.type === 'tar' || ahead.type === 'slab')) {
+            e.seen.add(ahead.id);
+            if (Math.random() < e.d.jump) { e.vy = -300; e.vx = dir * 215; e.grounded = false; e.jumping = true; e.jumpCd = 1.6; }
+          }
+        }
+      }
+      if (e.grounded && inHole(e.c, e.x)) { e.c++; e.grounded = false; e.falling = true; e.seen.clear(); }
+    }
+    if (!e.grounded) {
+      e.vy += G * dt;
+      if (e.falling) e.vx = 0;
+      e.y += e.vy * dt;
+      const ceil = floorY(e.c) - T;
+      if (!e.falling && e.y - h < ceil + 2) { e.y = ceil + 2 + h; if (e.vy < 0) e.vy = 0; }
+      if (e.y >= floorY(e.c)) {
+        if (inHole(e.c, e.x) && e.c < 3) { e.c++; e.falling = true; }
+        else { e.y = floorY(e.c); e.vy = 0; e.grounded = true; if (e.knocked) e.stun = 0.45; e.jumping = e.knocked = e.falling = false; }
+      }
+    }
+    e.x += e.vx * dt;
+    const minX = e.c === 0 ? -60 : T + 10;
+    e.x = Math.max(minX, Math.min(W - T - 10, e.x));
+    if (e.c === 3 && e.x <= 205) {
+      e.gone = true; e.stole = true; S.jars--;
+      puff(150, floorY(3) - 20, '#f4c542', 10);
+      S.fx.push({ k: 't', x: 150, y: floorY(3) - 50, txt: '-1 jar', life: 1.2, col: '#e5553d' });
+    }
+  }
+
+  /* traps */
+  for (const t of S.traps.values()) {
+    t.cd -= dt; t.t += dt; t.anim = Math.max(0, t.anim - dt);
+    const cx = t.col * T + 30, fy = floorY(t.c);
+    const onTile = e => e.c === t.c && e.grounded && !e.gone && Math.abs(e.x - cx) < 30;
+    if (t.type === 'scarab') {
+      if (t.cd <= 0) for (const e of S.raiders) if (onTile(e)) { zap(e); t.cd = L(t, [1.1, 0.7, 0.4]); t.anim = 0.25; break; }
+    } else if (t.type === 'slab') {
+      if (t.cd <= 0) {
+        let any = false;
+        for (const e of S.raiders) if (onTile(e) && !e.flung.has(t.id)) {
+          e.flung.add(t.id); any = true; e.seen.clear();
+          const d = dirOf(e.c); e.vx = -d * L(t, [520, 660, 800]) * (e.type === 'porter' ? 0.6 : 1); e.vy = -300; e.grounded = false; e.knocked = true; e.jumping = false;
+        }
+        if (any) { t.cd = L(t, [1.4, 1.0, 0.6]); t.anim = 0.3; }
+      }
+    } else if (t.type === 'dart') {
+      if (t.cd <= 0) {
+        const range = L(t, [3.5, 4.5, 5.5]) * T; let bestE = null, bd = 1e9;
+        for (const e of S.raiders) if (e.c === t.c && !e.falling && !e.gone && e.x > 0) { const d = Math.abs(e.x - cx); if (d < range && d < bd) { bd = d; bestE = e; } }
+        if (bestE) { t.cd = L(t, [1.0, 0.8, 0.6]); t.anim = 0.15; S.shots.push({ x: cx, y: fy - 22, vx: Math.sign(bestE.x - cx || 1) * 560, c: t.c, left: t.lvl, hitSet: new Set(), life: range / 560 + 0.05 }); }
+      }
+    } else if (t.type === 'urn') {
+      const period = L(t, [3.6, 3.0, 2.4]); const cyc = t.t % period; t.warm = Math.max(0, (cyc - (period - 1.4)) / 0.9); t.on = cyc > period - 0.5;
+      if (t.on) { const r = L(t, [1.5, 1.5, 2.5]) * T; for (const e of S.raiders) if (e.c === t.c && Math.abs(e.x - cx) < r && !e.falling) zap(e); }
+    } else if (t.type === 'eye') {
+      const r = L(t, [2.6, 3.0, 3.4]) * T; let bestE = null, bp = -1;
+      for (const e of S.raiders) { if (e.x < 0 || e.gone) continue; const dx = e.x - cx, dy = (e.y - 10) - (fy - 38); if (dx * dx + dy * dy < r * r && progress(e) > bp) { bp = progress(e); bestE = e; } }
+      if (bestE !== t.target) { t.target = bestE; t.charge = Math.min(t.charge, 0.2); }
+      if (bestE) { t.charge += dt; if (t.charge >= L(t, [1.1, 0.75, 0.45])) { t.charge = 0; t.flash = 0.12; t.fx2 = [bestE.x, bestE.y - 10]; zap(bestE); t.target = null; } }
+      else t.charge = 0;
+      t.flash = Math.max(0, (t.flash || 0) - dt);
+    }
+  }
+
+  /* darts: one raider each, more when upgraded */
+  for (const s of S.shots) {
+    s.x += s.vx * dt; s.life -= dt;
+    for (const e of S.raiders) if (e.c === s.c && !e.gone && !s.hitSet.has(e) && s.left > 0 && Math.abs(e.x - s.x) < 9 && e.y > s.y - 6) { s.hitSet.add(e); zap(e); s.left--; }
+  }
+  S.shots = S.shots.filter(s => s.left > 0 && s.life > 0);
+
+  const before = S.raiders.length;
+  S.raiders = S.raiders.filter(e => !e.gone);
+  for (const t of S.traps.values()) if (t.target && t.target.gone) t.target = null;
+
+  if (S.jars <= 0) return end();
+  if (S.raiders.length !== before || Math.floor(S.clock) !== S.shown) { S.shown = Math.floor(S.clock); refresh(); }
+  stepFx(dt);
+}
+function stepFx(dt) {
+  for (const f of S.fx) { f.life -= dt; if (f.k === 'p') { f.vy += 500 * dt; f.x += f.vx * dt; f.y += f.vy * dt; } else f.y -= 28 * dt; }
+  S.fx = S.fx.filter(f => f.life > 0);
+}
+function end() {
+  S.phase = 'over'; S.sel = null;
+  const record = S.clock > best;
+  if (record) { best = S.clock; try { localStorage.setItem('tomb-best', String(Math.floor(best))); } catch (e) {} }
+  refresh();
+  $('ovTitle').textContent = 'They took everything';
+  $('ovBody').innerHTML = `<p>You held the tomb for ${fmt(S.clock)} and stopped ${S.kills} raiders before the last jar left the pyramid. ${record ? 'That is your longest stand yet.' : 'Your longest stand is ' + fmt(best) + '.'}</p>`;
+  $('ovBtn').textContent = 'Play again';
+  $('overlay').hidden = false;
+}
+
+/* ---------- drawing ---------- */
+function rr(c, x, y, w, h, r) { c.beginPath(); c.roundRect(x, y, w, h, r); }
+
+function drawTrap(c, t, cx, fy, icon) {
+  const lvlCol = ['#e0b266', '#37c2ad', '#f4c542'][t.lvl - 1];
+  if (t.type === 'scarab') {
+    const hop = t.anim > 0 ? -10 * Math.sin(t.anim / 0.25 * Math.PI) : 0;
+    const tired = !icon && t.cd > 0 && t.anim <= 0;
+    [[-15, 0], [2, 1], [16, 0]].forEach(([dx, k], i) => {
+      const wob = icon || tired ? 0 : Math.sin(S.time * 6 + i * 2) * 2;
+      c.fillStyle = '#143f46'; c.beginPath(); c.ellipse(cx + dx + wob, fy - 5 + (k ? hop * .6 : hop), 8, 5, 0, 0, 7); c.fill();
+      c.fillStyle = tired ? '#1f6b60' : '#37c2ad'; c.beginPath(); c.ellipse(cx + dx + wob, fy - 6 + (k ? hop * .6 : hop), 5, 3, 0, 0, 7); c.fill();
+    });
+  } else if (t.type === 'tar') {
+    c.fillStyle = '#0b090d'; c.beginPath(); c.ellipse(cx, fy - 2, 27, 6, 0, 0, 7); c.fill();
+    c.fillStyle = '#3a3340'; const b = icon ? .5 : (S.time * .8 + t.col * .3) % 1;
+    c.beginPath(); c.arc(cx - 10, fy - 4 - b * 3, 2 + b * 2, 0, 7); c.fill();
+    c.beginPath(); c.arc(cx + 9, fy - 3 - ((b + .5) % 1) * 3, 1.5 + ((b + .5) % 1) * 2, 0, 7); c.fill();
+  } else if (t.type === 'dart') {
+    c.fillStyle = '#8a6d3c'; rr(c, cx - 13, fy - 46, 26, 30, 5); c.fill();
+    c.fillStyle = '#e0b266'; rr(c, cx - 10, fy - 43, 20, 24, 4); c.fill();
+    c.fillStyle = '#2a1d05'; c.fillRect(cx - 7, fy - 38, 5, 3); c.fillRect(cx + 2, fy - 38, 5, 3);
+    c.beginPath(); c.arc(cx, fy - 27, t.anim > 0 ? 5 : 3.5, 0, 7); c.fill();
+  } else if (t.type === 'slab') {
+    const up = t.anim > 0 ? Math.sin(t.anim / 0.3 * Math.PI) : 0;
+    c.save(); c.translate(cx, fy); c.rotate(-up * 0.6 * (icon ? 1 : dirOf(t.c)));
+    c.fillStyle = '#b9945a'; c.fillRect(-25, -6, 50, 6);
+    c.fillStyle = '#3b82d6'; c.fillRect(-18, -6, 8, 3); c.fillRect(-4, -6, 8, 3); c.fillRect(10, -6, 8, 3);
+    c.restore();
+    if (t.cd > 0 && !icon) { c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(cx - 25, fy - 6, 50, 6); }
+  } else if (t.type === 'urn') {
+    if (t.on && !icon) {
+      const r = L(t, [1.5, 1.5, 2.5]) * T;
+      for (let x = -r + 8; x < r; x += 14) {
+        const fl = 14 + 16 * Math.abs(Math.sin(S.time * 14 + x)); const k = 1 - Math.abs(x) / r * 0.5;
+        c.fillStyle = 'rgba(244,120,40,.8)'; c.beginPath(); c.ellipse(cx + x, fy - fl * k / 2, 8, fl * k / 2 + 3, 0, 0, 7); c.fill();
+        c.fillStyle = 'rgba(255,225,120,.9)'; c.beginPath(); c.ellipse(cx + x, fy - fl * k / 4, 4, fl * k / 4 + 2, 0, 0, 7); c.fill();
+      }
+    }
+    c.fillStyle = '#8c3b25'; c.beginPath(); c.ellipse(cx, fy - 12, 12, 12, 0, 0, 7); c.fill();
+    c.fillRect(cx - 7, fy - 28, 14, 8);
+    c.fillStyle = '#f4c542'; c.fillRect(cx - 12, fy - 14, 24, 3);
+    const warm = icon ? 1 : Math.min(1, t.warm || 0);
+    if (warm > 0) { c.fillStyle = `rgba(255,170,60,${warm})`; c.beginPath(); c.ellipse(cx, fy - 31, 5, 4 + 3 * warm, 0, 0, 7); c.fill(); }
+  } else if (t.type === 'eye') {
+    const ey = fy - 38;
+    c.fillStyle = '#1d2f55'; c.beginPath(); c.ellipse(cx, ey, 17, 11, 0, 0, 7); c.fill();
+    c.fillStyle = '#f3e6c8'; c.beginPath(); c.ellipse(cx, ey, 13, 7.5, 0, 0, 7); c.fill();
+    let px = 0, py = 0;
+    if (t.target) { const a = Math.atan2(t.target.y - 10 - ey, t.target.x - cx); px = Math.cos(a) * 5; py = Math.sin(a) * 3; }
+    c.fillStyle = '#3b82d6'; c.beginPath(); c.arc(cx + px, ey + py, 5.5, 0, 7); c.fill();
+    c.fillStyle = '#0b090d'; c.beginPath(); c.arc(cx + px, ey + py, 2.5, 0, 7); c.fill();
+    c.strokeStyle = '#1d2f55'; c.lineWidth = 3; c.beginPath(); c.moveTo(cx - 4, ey + 10); c.quadraticCurveTo(cx - 6, ey + 20, cx - 14, ey + 20); c.stroke();
+  }
+  if (!icon) for (let i = 0; i < t.lvl; i++) { c.fillStyle = lvlCol; c.fillRect(cx - 26 + i * 6, fy - 57, 4, 4); }
+}
+
+function drawRaider(e) {
+  const s = e.d.s, x = e.x, y = e.y, dir = e.knocked ? -dirOf(e.c) : dirOf(e.c);
+  ctx.save(); ctx.translate(x, y); ctx.scale(s * dir, s);
+  if (e.knocked) { ctx.translate(0, -13); ctx.rotate(-(S.time * 14 % 6.28)); ctx.translate(0, 13); }
+  const sw = e.grounded && e.stun <= 0 ? Math.sin(e.ph) * 4 : 2;
+  ctx.fillStyle = '#3a2c1d'; ctx.fillRect(-5 + sw, -7, 4, 7); ctx.fillRect(1 - sw, -7, 4, 7);
+  ctx.fillStyle = e.hit > 0 ? '#ffffff' : e.d.col; rr(ctx, -7, -19, 14, 13, 3); ctx.fill();
+  ctx.fillStyle = '#e8b98c'; ctx.beginPath(); ctx.arc(0, -23, 5.5, 0, 7); ctx.fill();
+  ctx.fillStyle = '#1b1410'; ctx.fillRect(2, -24.5, 2, 2);
+  if (e.type === 'looter' || e.type === 'porter') { ctx.fillStyle = '#efe2bd'; ctx.beginPath(); ctx.arc(0, -25, 6, Math.PI, 0); ctx.fill(); ctx.fillRect(-8, -26, 16, 2); }
+  else if (e.type === 'runner') { ctx.fillStyle = '#8f1f14'; ctx.fillRect(-6, -28, 12, 3); ctx.fillRect(-10, -27, 5, 2); }
+  else if (e.type === 'acro') { ctx.fillStyle = '#4b2a73'; ctx.beginPath(); ctx.arc(0, -25, 5.8, Math.PI, 0); ctx.fill(); ctx.fillRect(0, -26, 9, 2); }
+  if (e.shield) { ctx.fillStyle = '#5b4126'; rr(ctx, 5, -22, 9, 20, 2); ctx.fill(); ctx.fillStyle = '#8a6d3c'; ctx.fillRect(6, -14, 7, 2); }
+  ctx.restore();
+}
+
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.fillStyle = '#b88f52'; ctx.fillRect(0, 0, W, H);
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c <= COLS; c++) {
+    ctx.fillStyle = (r + c) % 2 ? '#c29a5c' : '#b38a4e';
+    ctx.fillRect(c * T + (r % 2 ? 0 : 30) - 30, r * T, T - 2, T / 2 - 2);
+    ctx.fillRect(c * T + (r % 2 ? 30 : 0) - 30, r * T + T / 2, T - 2, T / 2 - 2);
+  }
+  for (let c = 0; c < 4; c++) {
+    const y = floorY(c) - T, x0 = c === 0 ? 0 : T;
+    ctx.fillStyle = '#241d2b'; ctx.fillRect(x0, y, W - T - x0, T);
+    ctx.fillStyle = '#2c2434';
+    for (let col = 1; col < 15; col++) { const g = (col * 7 + c * 3) % 5; ctx.fillRect(col * T + 14 + g * 3, y + 10 + g * 2, 6, 3); ctx.fillRect(col * T + 34 - g, y + 20 + g, 3, 8); }
+    const h = holeCol(c);
+    if (h >= 0) { ctx.fillStyle = '#241d2b'; ctx.fillRect(h * T, floorY(c), T, T); }
+    ctx.fillStyle = 'rgba(0,0,0,.28)'; ctx.fillRect(x0, y, W - T - x0, 6);
+    ctx.fillStyle = 'rgba(224,178,102,.16)';
+    for (let col = 2; col < 14; col += 3) { const cx = col * T + 30, d = dirOf(c); ctx.beginPath(); ctx.moveTo(cx - 6 * d, y + 24); ctx.lineTo(cx + 6 * d, y + 30); ctx.lineTo(cx - 6 * d, y + 36); ctx.closePath(); ctx.fill(); }
+    for (const col of [4, 10]) {
+      const tx = col * T + (c % 2 ? 0 : 30), ty = y + 16, fl = Math.sin(S.time * 9 + col + c) * 2;
+      const g = ctx.createRadialGradient(tx, ty, 2, tx, ty, 70); g.addColorStop(0, 'rgba(255,180,80,.20)'); g.addColorStop(1, 'rgba(255,180,80,0)');
+      ctx.fillStyle = g; ctx.fillRect(tx - 70, y, 140, T);
+      ctx.fillStyle = '#5b4126'; ctx.fillRect(tx - 2, ty, 4, 12);
+      ctx.fillStyle = '#ff9a3c'; ctx.beginPath(); ctx.ellipse(tx, ty - 3, 4, 7 + fl, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = '#ffe08a'; ctx.beginPath(); ctx.ellipse(tx, ty - 1, 2, 3.5, 0, 0, 7); ctx.fill();
+    }
+  }
+  ctx.fillStyle = '#1b2a4d'; ctx.fillRect(0, T, 14, T);
+  ctx.fillStyle = '#f3e6c8'; ctx.fillRect(4, T + 12, 2, 2); ctx.fillRect(9, T + 30, 2, 2);
+
+  /* the king and his jars */
+  const fy3 = floorY(3);
+  ctx.fillStyle = '#6b4a8a'; rr(ctx, T + 6, fy3 - 22, 44, 22, 4); ctx.fill();
+  ctx.fillStyle = '#f4c542'; ctx.fillRect(T + 6, fy3 - 14, 44, 3);
+  const peek = S.raiders.some(e => e.c === 3) ? 12 : 4 + Math.sin(S.time * 1.5) * 1.5;
+  ctx.fillStyle = '#e9e4d6'; ctx.beginPath(); ctx.arc(T + 28, fy3 - 22 - peek + 8, 9, Math.PI, 0); ctx.fill(); ctx.fillRect(T + 19, fy3 - 22 - peek + 8, 18, peek - 8 > 0 ? peek - 8 : 0);
+  if (peek > 8) { ctx.fillStyle = '#17131c'; ctx.fillRect(T + 23, fy3 - 20 - peek + 4, 3, 3); ctx.fillRect(T + 31, fy3 - 20 - peek + 4, 3, 3); }
+  else { ctx.font = '700 11px Rubik, sans-serif'; ctx.fillStyle = 'rgba(243,230,200,.6)'; ctx.fillText('z', T + 40, fy3 - 34 - (S.time * 8 % 10)); }
+  for (let i = 0; i < Math.max(0, S.jars); i++) {
+    const jx = 2 * T + 4 + (i % 10) * 11, jy = fy3 - (i >= 10 ? 20 : 0);
+    ctx.fillStyle = '#c99a1e'; ctx.beginPath(); ctx.ellipse(jx + 5, jy - 7, 5, 7, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f4c542'; ctx.fillRect(jx + 2, jy - 16, 6, 4); ctx.fillStyle = '#3b82d6'; ctx.fillRect(jx, jy - 9, 10, 2);
+  }
+
+  const hl = S.sel ? { c: S.sel.c, col: S.sel.col } : S.hover;
+  if (hl && S.phase !== 'over') {
+    const ok = S.sel || (S.pick && buildable(hl.c, hl.col) && !S.traps.has(key(hl.c, hl.col)));
+    if (S.sel || S.pick) {
+      ctx.strokeStyle = S.sel ? '#f4c542' : ok ? 'rgba(55,194,173,.9)' : 'rgba(229,85,61,.8)'; ctx.lineWidth = 2;
+      ctx.strokeRect(hl.col * T + 1, floorY(hl.c) - T + 1, T - 2, T - 2);
+    }
+    const t = S.sel || (ok ? { type: S.pick, lvl: 1, c: hl.c, col: hl.col } : null);
+    if (t) {
+      const cx = t.col * T + 30, fy = floorY(t.c); ctx.fillStyle = 'rgba(244,197,66,.10)'; ctx.strokeStyle = 'rgba(244,197,66,.45)'; ctx.lineWidth = 1;
+      if (t.type === 'dart' || t.type === 'urn') { const r = (t.type === 'dart' ? L(t, [3.5, 4.5, 5.5]) : L(t, [1.5, 1.5, 2.5])) * T; const a = Math.max(T, cx - r), b = Math.min(W - T, cx + r); ctx.fillRect(a, fy - T, b - a, T); ctx.strokeRect(a, fy - T, b - a, T); }
+      if (t.type === 'eye') { ctx.beginPath(); ctx.arc(cx, fy - 38, L(t, [2.6, 3.0, 3.4]) * T, 0, 7); ctx.fill(); ctx.stroke(); }
+    }
+  }
+
+  for (const t of S.traps.values()) drawTrap(ctx, t, t.col * T + 30, floorY(t.c), false);
+  for (const t of S.traps.values()) if (t.type === 'eye') {
+    const cx = t.col * T + 30, ey = floorY(t.c) - 38;
+    if (t.target) { const e = t.target, k = Math.min(1, t.charge / L(t, [1.1, 0.75, 0.45])); ctx.strokeStyle = `rgba(59,130,214,${0.2 + k * 0.5})`; ctx.lineWidth = 1 + k * 3; ctx.beginPath(); ctx.moveTo(cx, ey); ctx.lineTo(e.x, e.y - 10); ctx.stroke(); }
+    if (t.flash > 0 && t.fx2) { ctx.strokeStyle = '#cfe4ff'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(cx, ey); ctx.lineTo(t.fx2[0], t.fx2[1]); ctx.stroke(); }
+  }
+  for (const e of S.raiders) drawRaider(e);
+  ctx.fillStyle = '#f3e6c8'; for (const s of S.shots) ctx.fillRect(s.x - 7, s.y - 1, 14, 2.5);
+  for (const f of S.fx) {
+    ctx.globalAlpha = Math.min(1, f.life * 2.5);
+    if (f.k === 'p') { ctx.fillStyle = f.col; ctx.fillRect(f.x - 2, f.y - 2, 4, 4); }
+    else { ctx.font = '700 15px Rubik, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#17131c'; ctx.fillText(f.txt, f.x + 1, f.y + 1); ctx.fillStyle = f.col; ctx.fillText(f.txt, f.x, f.y); ctx.textAlign = 'left'; }
+    ctx.globalAlpha = 1;
+  }
+  if (S.phase === 'paused' || S.phase === 'idle') {
+    ctx.font = '700 13px Rubik, sans-serif'; ctx.fillStyle = '#17131c';
+    ctx.fillText(S.phase === 'idle' ? 'Gates closed. Build, then open the gates.' : 'Paused. You can still build.', 20, 40);
+  }
+}
+
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(0.033, (now - last) / 1000); last = now;
+  if ($('overlay').hidden) for (let i = 0; i < S.speed; i++) step(dt); else S.time += dt;
+  draw();
+  requestAnimationFrame(frame);
+}
+reset();
+window.__tomb = { S: () => S, step, toggleRun };
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
