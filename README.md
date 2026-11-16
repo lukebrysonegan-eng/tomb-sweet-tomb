@@ -1,14 +1,17 @@
-# Tomb Sweet Tomb
+# Hold the Line
 
-A small browser game. You are King Naptep, a mummy who wants to sleep. An endless stream of tiny tomb raiders runs and jumps down your pyramid to steal your golden jars. Build traps in the corridors to stop them. One touch from any trap finishes a raider.
+A small browser game. You command a supply depot at the end of a field. Scouts run and jump towards it, and each generation copies the moves of the ones that got furthest, so they learn their way past the ponds and then past your defences.
 
 ## Play
 
 Open `index.html` in a browser. There is nothing to install or build.
 
-- Pick a trap from the shop, then tap a corridor tile to build it.
-- Press **Open the gates** to start the stream. You can pause and keep building.
-- Tap a built trap to upgrade or sell it.
-- Keys: `1`–`6` pick a trap, `Space` starts or pauses.
+- The home screen has three game slots and the permanent upgrades.
+- Pick a defence from the shop, then tap a tile to build it. Everything you have unlocked is free to build, remove and move.
+- Coins come only from holding: every 15 seconds with no scout reaching the depot pays out. Spend them on unlocking weapons, upgrading them and extending the field.
+- When the depot falls you earn medals for every generation you lasted. Medals buy upgrades that apply to every game.
+- Keys: `1`–`7` pick a defence, `Space` starts or pauses.
 
-You start with 20 jars and lose one for each raider that reaches the bottom. Play for the longest time.
+## Saving
+
+Games and medals are saved in the browser's local storage. When the page runs as a Claude artifact it also saves to the viewer's Claude account; opened as a plain file, that part is skipped.
